@@ -5,3 +5,5 @@ It requires passing in input the path to the ROM.
 Standard output is fully working and goes to GameLogic.txt.
 The g option makes it use a graph logic, which isn't fully working but could be useful to analyze some code.
 To use it, type your path to the ROM and then "g".
+
+To interpret what's written, look at https://datacrystal.romhacking.net/wiki/MOTHER_3:Game_logic
