@@ -212,9 +212,9 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             return (((I1) + (I2 << 8)) << 16) >> 16;
 
         }
-        public static int ToInt2Bytes(byte[] Data, int address) //Read bytes
+        public static short ToInt2Bytes(byte[] Data, int address) //Read bytes
         {
-            return (Data[address]) + (Data[address + 1] << 8);
+            return (short)((Data[address]) + (Data[address + 1] << 8));
         }
         public static int ToInt3Bytes(byte[] Data, int address) //Read bytes
         {
@@ -313,6 +313,8 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                     {
                         case 0x00:
                             return "(DELAY PARSING BY $1)";
+                        case 0x03:
+                            return "(LOAD SCRIPT " + CurrBlock.BlockNum + "-$1)";
                         case 0x0A:
                             return "(SET EVENT FLAG $2 TO $1)";
                         case 0x0B:
@@ -330,9 +332,37 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                         case 0x33: //Display from bank 0
                             return "(DISPLAY 0-$1, $2, ^$3)";
                         case 0x32: //Display from bank we're in
+                            if(CurrBlock.BlockNum == 0)
+                                return "(DISPLAY CALLER-$1, $2, ^$3)";
                             return "(DISPLAY " + CurrBlock.BlockNum + "-$1, $2, ^$3)";
+                        case 0x36:
+                            return "(PUSH MENU SELECTION)";
+                        case 0x77:
+                            return "(STOP SCREEN SHAKING)";
+                        case 0x83:
+                            return "(PLAY SOUND $2, $1)";
                         case 0x8C:
                             return "(START BATTLE AGAINST $1)";
+                        case 0xA0:
+                            return "(OPEN UP SHOP MENU $2, $1)";
+                        case 0xA1:
+                            return "(OPEN UP SAVING MENU)";
+                        case 0xA2:
+                            return "(OPEN UP NAMING MENU $1)";
+                        case 0xA3:
+                            return "(CHECK $1'S FAKE NAME)";
+                        case 0xA4:
+                            return "(OPEN ITEM GUY MENU)";
+                        case 0xA5:
+                            return "(OPEN MONEY MENU)";
+                        case 0xAA:
+                            return "(RESTART THE GAME)";
+                        case 0xB5:
+                            return "(LOAD SPRITE TABLE $1)";
+                        case 0xEC:
+                            return "(PUSH CHARACTER $1'S LEVEL)";
+                        case 0xF6:
+                            return "(START STAFF ROLL)";
                         default:
                             string tmp = "(" + Utilities.ToHex(CommandType, 2) + " " + Utilities.ToHex(x, 2) + " " + Utilities.ToHex(y, 2) + " " + Utilities.ToHex(z, 2);
                             if (NumParam > 0)
@@ -465,10 +495,13 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 {
                     int tempData = DataList[DataList.Count - i];
                     if (tempData == SingleCommand.ImpossibleData)
+                    {
+                        t = t.Replace("^$" + i, tmp[tmp.Count - i]);
                         t = t.Replace("$" + i, tmp[tmp.Count - i]);
+                    }
                     else
                     {
-                        if (tempData <= -1)
+                        if ((tempData <= -1) && this.CommandType == 4 && (this.Y == 0x32 || this.Y == 0x33))
                         {
                             if (tempData == -1)
                             {
@@ -477,6 +510,10 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                             else
                                 t = t.Replace("^$" + i, "TEAM MEMBER " + (Math.Abs(tempData) - 1));
                         }
+                        if (this.CommandType == 4 && this.Y == 0xA3)
+                            t = tempData == 0 ? t.Replace("$" + i, "DUSTER") : tempData == 2 ? t.Replace("$" + i, "KUMATORA") : t;
+                        if (this.CommandType == 4 && this.Y == 3)
+                            t = t.Replace("$" + i, (tempData + 5).ToString());
                         t = t.Replace("$" + i, tempData.ToString());
                     }
                     if(Graph)
@@ -611,13 +648,16 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
     }
     class Block
     {
-        private const int MAXBLOCKS = 0x10000;
+        private const int MAXBLOCKS = 0x4000;
         private BlockStatus[] status;
         private int[] number;
         private int[] commandNum;
         private int[] graphAssociatedToBlock;
         private int[] blockAssociatedToGraph;
         private bool[] externalFunction;
+        private bool[] mainCaller;
+        private bool[] special;
+        private bool[] fifteenth_bit;
         private int[] referencesTo;
         private int entryNum;
         private int blockNum;
@@ -635,6 +675,9 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             GraphAssociatedToBlock = new int[MAXBLOCKS];
             BlockAssociatedToGraph = new int[MAXBLOCKS];
             ExternalFunction = new bool[MAXBLOCKS];
+            Special = new bool[MAXBLOCKS];
+            Fifteenth_bit = new bool[MAXBLOCKS];
+            MainCaller = new bool[MAXBLOCKS];
             for (int i = 0; i < MAXBLOCKS; i++)
             {
                 Status[i] = BlockStatus.end;
@@ -647,7 +690,28 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             Number[blockCommand] = EntryNum;
             ReferencesTo[blockCommand]++;
             CommandNum[EntryNum] = blockCommand;
+            MainCaller[EntryNum] = false;
+            Special[EntryNum] = false;
+            Fifteenth_bit[EntryNum] = false;
             EntryNum++;
+        }
+        public void UpdateToDiscovered(int blockCommand, bool main)
+        {
+            bool tmp = false, tmp15 = false;
+            if (blockCommand < 0)
+            {
+                blockCommand = blockCommand & 0x7FFF;
+                tmp = true;
+            }
+            if ((blockCommand & 0x4000) != 0)
+            {
+                blockCommand = blockCommand & 0x3FFF;
+                tmp15 = true;
+            }
+            UpdateToDiscovered(blockCommand);
+            MainCaller[EntryNum - 1] = main;
+            Special[EntryNum - 1] = tmp;
+            Fifteenth_bit[EntryNum - 1] = tmp15;
         }
 
         public void CheckBranch(int Branch, int Subptr, byte[] Data)
@@ -778,6 +842,10 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 blockAssociatedToGraph = value;
             }
         }
+
+        public bool[] MainCaller { get => mainCaller; set => mainCaller = value; }
+        public bool[] Special { get => special; set => special = value; }
+        public bool[] Fifteenth_bit { get => fifteenth_bit; set => fifteenth_bit = value; }
     }
     class BlockNode
     {
@@ -1630,7 +1698,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             int entries = Utilities.ToInt2Bytes(Data, entry.Pointers);
             for (int i=0; i<entries; i++) //Separate the two, so there won't be repeated things in the future
             {
-                CurrBlock.UpdateToDiscovered(Utilities.ToInt2Bytes(Data, entry.Pointers + 2 * (i + 1)));
+                CurrBlock.UpdateToDiscovered(Utilities.ToInt2Bytes(Data, entry.Pointers + 2 * (i + 1)), true);
             }
             for (int i = 0; i < CurrBlock.EntryNum; i++)
             {
@@ -1668,7 +1736,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             string[] ReadGameLogic = new string[NumElem];
             for (int i = 0; i < NumElem; i++)
             {
-                ReadGameLogic[i] = CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
+                ReadGameLogic[i] = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
                 ReadGameLogic[i] += ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0);
             }
             return ReadGameLogic;
@@ -1812,12 +1880,12 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
 
         static int Main(string[] args) //Decompile only for now
         {
-            if (args.Count() < 1)
-            {
-                Console.WriteLine("Write the path to the ROM!\n");
-                return -2;
-            }
-            byte[] Data = File.ReadAllBytes(args[0]);
+            //if (args.Count() < 1)
+            //{
+            //    Console.WriteLine("Write the path to the ROM!\n");
+            //    return -2;
+            //}
+            byte[] Data = File.ReadAllBytes("C:\\Users\\lollo\\Desktop\\M3Eng\\test.gba");
             const int paramAddress = 0xD2D658;
             int[] extendedCodeParameters = new int[256];
             for (int i = 0; i < 256; i++)
@@ -1850,7 +1918,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 entriespointers[i].Pointers = Utilities.ToInt4Bytes(Data, baseaddress + 4 + (i * 8)) + baseaddress;
                 entriespointers[i].Logic = Utilities.ToInt4Bytes(Data, baseaddress + 8 + (i * 8)) + baseaddress;
                 ConvertedEntries[i] = new List<string>();
-                ConvertedEntries[i].Add("[BLOCK " + i.ToString() + "]");
+                ConvertedEntries[i].Add("[BLOCK " + i.ToString() + "] 0x" + entriespointers[i].Pointers.ToString("X"));
                 List<FullGraph> Graph = null;
                 if (entriespointers[i].Logic != baseaddress && entriespointers[i].Pointers != baseaddress)
                 {
@@ -1861,13 +1929,21 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                     i = numentries;
             }
                 List<string> FinalProduct= new List<string>();
-            for(int i=0; i<numentries; i++)
+            if (Linear)
+                FinalProduct.Add("L");
+            else
+                FinalProduct.Add("G");
+            for (int i=0; i<numentries; i++)
             {
                 FinalProduct.AddRange(ConvertedEntries[i]);
                 FinalProduct.Add("");
             }
             File.WriteAllLines("GameLogic.txt", FinalProduct);
             return 0;
+        }
+        private static void Compile(string[] args)
+        {
+
         }
     }
 }
