@@ -2106,7 +2106,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 FinalProduct.AddRange(ConvertedEntries[i]);
                 FinalProduct.Add("");
             }
-            File.WriteAllLines("GameLogicJP.txt", FinalProduct);
+            File.WriteAllLines("GameLogic.txt", FinalProduct);
             return 0;
         }
         private static void Compile(string[] args)
