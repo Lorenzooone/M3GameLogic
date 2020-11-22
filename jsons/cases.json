@@ -1,0 +1,65 @@
+{
+   "29": {
+        "0": "[RESTORE PARTY'S HP AND PP, UPDATE SPRITES]",
+        "1": "[RESTORE PARTY'S HP, UPDATE SPRITES]",
+        "2": "[RESTORE PARTY'S PP, UPDATE SPRITES]",
+        "3": "[RESTORE PARTY'S HP TO AT LEAST 1, UPDATE SPRITES]",
+        "default": "[RESTORE PARTY'S HP AND PP BASED ON \\data(0), UPDATE SPRITES]"
+    },
+   "43": {
+        "-1": "[SET \\char(\\data(2))'S SPRITE TO \\data(0)]",
+        "default": "[SET \\char(\\data(2))'S SPRITE TO \\data(0) AND LEVEL TO \\data(1)]"
+    },
+    "44": {
+        "-1": "[\\case(\\data(0), 44-1)]",
+        "default": "[\\case(\\data(0), 44-1) OF PARTY MEMBER \\data(2)]"
+    },
+    "44-1": {
+        "0": "???",
+        "neg": "REMOVE \\data(0) OF ITEM \\data(1) FROM INVENTORY",
+        "default": "ADD \\data(0) OF ITEM \\data(1) TO INVENTORY"
+    },
+    "48": {
+        "0": "[ADD \\ailment(\\data(1)) TO PARTY MEMBER \\data(2)]",
+        "1": "[REMOVE \\ailment(\\data(1)) FROM PARTY MEMBER \\data(2)]",
+        "default": "[SET \\ailment(\\data(1)) FOR PARTY MEMBER \\data(2) TO \\data(0)]"
+    },
+    "50": {
+        "0": "[DISPLAY CALLER-\\data(0), \\data(1), \\case(\\data(2), 50-1)]",
+        "default": "[DISPLAY \\blocknum()-\\data(0), \\data(1), \\case(\\data(2), 50-1)]"
+    },
+    "50-1": {
+        "-1": "SPEAKER: INTERACTED OBJECT",
+        "-2": "SPEAKER: FIRST PARTY MEMBER",
+        "-3": "NO SPEAKER",
+        "100+": "SPEAKER: CHARACTER \\sub(\\data(2), 100)",
+        "default": "SPEAKER: SPRITE \\data(2)"
+    },
+    "81": {
+        "0": "",
+        "1": ", LOOPED",
+        "default": ", LOOP: \\data(0)"
+    },
+    "130": {
+        "-1": "SAME AS CURRENT",
+        "default": "\\data(0)"
+    },
+    "181": {
+        "-1": "OBJECT",
+        "default": "PARTY MEMBER \\data(0)"
+    },
+    "212": {
+        "-1": "100",
+        "default": "\\data(0)"
+    },
+    "221": {
+        "1": "SECOND",
+        "0": "FIRST",
+        "default": "\\data()"
+    },
+    "239": {
+        "1": "SET",
+        "0": "UNSET",
+        "default": "SET \\data(0) TO"
+    }
+}

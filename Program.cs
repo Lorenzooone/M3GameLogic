@@ -7,14 +7,16 @@ using System.Threading.Tasks;
 
 //0x1198C10
 
-namespace ConsoleApplication11 //Decompile Game Logic Table
+namespace M3GameLogic //Decompile Game Logic Table
 {
     enum BlockStatus { start, used, end, discovered };
     enum BranchType { NaB, DoWhile, While, If, Break, ToDefine, Else, GoTo }; //NaB = Not a Branch
+
     class PointerCouple
     {
         public int Pointers = 0, Logic = 0;
     }
+
     class Arguments {
         public byte[] Data;
         public int start;
@@ -30,146 +32,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             this.Data = Data; this.start = start; this.bank = bank; this.CurrBlock = CurrBlock; this.Block0 = Block0; this.tmp = tmp; this.DataList = DataList; this.numblock = numblock; this.visitedBlock = visitedBlock; this.returningStack = returningStack;
         }
     }
-    class LogicBlock
-    {
-        private BlockNode start, end;
 
-        public LogicBlock(BlockNode start, BlockNode end)
-        {
-            Start = start;
-            End = end;
-        }
-
-        internal BlockNode End
-        {
-            get
-            {
-                return end;
-            }
-
-            set
-            {
-                end = value;
-            }
-        }
-
-        internal BlockNode Start
-        {
-            get
-            {
-                return start;
-            }
-
-            set
-            {
-                start = value;
-            }
-        }
-    }
-    class Cycle : LogicBlock
-    {
-        private BlockNode exit, realStart, realestStart;
-        private bool doWhile;
-        public Cycle(BlockNode start, BlockNode realStart, BlockNode realestStart, BlockNode end, BlockNode exit, List<BlockNode> LinearizedGraph, bool doWhile) : base(start, end)
-        {
-            Exit = exit;
-            DoWhile = DoWhile;
-            RealStart = realStart;
-            RealestStart = realestStart;
-            UpdateCycleFrom(LinearizedGraph);
-        }
-
-        private void UpdateCycleFrom(List<BlockNode> LinearizedGraph)
-        {
-            for (int i = Start.IndexInLinearizedGraph; i < Exit.IndexInLinearizedGraph; i++)
-            {
-                LinearizedGraph[i].CycleIn = this;
-            }
-        }
-
-        internal BlockNode Exit
-        {
-            get
-            {
-                return exit;
-            }
-
-            set
-            {
-                exit = value;
-            }
-        }
-
-        public bool DoWhile
-        {
-            get
-            {
-                return doWhile;
-            }
-
-            set
-            {
-                doWhile = value;
-            }
-        }
-
-        internal BlockNode RealStart
-        {
-            get
-            {
-                return realStart;
-            }
-
-            set
-            {
-                realStart = value;
-            }
-        }
-
-        internal BlockNode RealestStart
-        {
-            get
-            {
-                return realestStart;
-            }
-
-            set
-            {
-                realestStart = value;
-            }
-        }
-    }
-    class Else : LogicBlock
-    {
-        private BlockNode exit;
-        public Else(BlockNode start, BlockNode end, BlockNode exit, List<BlockNode> LinearizedGraph) : base(start, end)
-        {
-            Exit = exit;
-            Start.ElseIn = this;
-            End.ElseIn = this;
-        }
-
-        private void UpdateElseFrom(List<BlockNode> LinearizedGraph)
-        {
-            for (int i = Start.IndexInLinearizedGraph; i < Exit.IndexInLinearizedGraph; i++)
-            {
-                LinearizedGraph[i].ElseIn = this;
-            }
-        }
-
-        internal BlockNode Exit
-        {
-            get
-            {
-                return exit;
-            }
-
-            set
-            {
-                exit = value;
-            }
-        }
-    }
     class Utilities
     {
         public static string ToHex(int a, int numbers)
@@ -236,10 +99,10 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             return (Data[address]) + (Data[address + 1] << 8) + (Data[address + 2] << 16);
         }
     }
+
     class SingleCommand
     {
-        private int commandType, x, y, z, numParam, data, labelsNum, pointedEntry;
-        private String command;
+        private int pointedEntry;
         public const int ImpossibleData = 0x1000000;
 
         public SingleCommand(int CT, int X, int Y, int Z)
@@ -248,223 +111,100 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             this.X = X;
             this.Y = Y;
             this.Z = Z;
-            NumParam = 0;
+            NumParam = GetParamsNum();
             Data = ImpossibleData; //Impossible default value
         }
 
-        public SingleCommand(int CT, int X, int Y, int Z, Block Block0, Block CurrBlock) : this(CT, X, Y, Z)
-        {
-            Command = TranslateToText(Block0, CurrBlock);
-        }
-
-        public SingleCommand(int CT, int X, int Y, int Z, Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum) : this(CT, X, Y, Z)
+        public SingleCommand(int CT, int X, int Y, int Z, Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum, Parser parser) : this(CT, X, Y, Z)
         {
             this.LabelsNum = LabelsNum;
-                Command = TranslateToText(Block0, CurrBlock, Zone, Graph, Labels);
+                Command = TranslateToText(Block0, CurrBlock, Zone, Graph, Labels, parser);
         }
         
         override public String ToString()
         {
             if (Command == null)
             {
-                return "[" + Utilities.ToHex(CommandType, 2) + " " + Utilities.ToHex(x, 2) + " " + Utilities.ToHex(y, 2) + " " + Utilities.ToHex(z, 2) + "]";
+                return "[" + Utilities.ToHex(CommandType, 2) + " " + Utilities.ToHex(X, 2) + " " + Utilities.ToHex(Y, 2) + " " + Utilities.ToHex(Z, 2) + "]";
             }
             else return Command;
         }
 
-        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, List<int> DataList, List<String> tmp)
+        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, Parser parser)
         {
-            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3], Block0, CurrBlock);
+            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3]);
             if (c.CommandType == 5)
                 c.PointedEntry = Block0.Number[Utilities.ToInt2Ints(c.Y, c.Z)];
             if (c.CommandType == 7 || c.CommandType == 0xC || c.CommandType == 0xD)
                 c.PointedEntry = CurrBlock.Number[Utilities.ToInt2Ints(c.Y, c.Z)];
-            string t = c.ToString();
-            t = c.InsertPreviousCommand(DataList, t, tmp, false);
-            tmp.Add(t);
-            DataList.Add(c.Data);
+            parser.TranslateToText(c);
             return c;
         }
 
-        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, List<int> DataList, List<String> tmp, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum)
+        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, List<int> DataList, List<String> tmp, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum, Parser parser)
         {
-            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3], Block0, CurrBlock, Zone, Graph, Labels, LabelsNum);
-            string t = c.ToString();
-            t = c.InsertPreviousCommand(DataList, t, tmp, true);
-            if(t != "")
-                t += Environment.NewLine;
-            tmp.Add(t);
-            DataList.Add(c.Data);
+            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3], Block0, CurrBlock, Zone, Graph, Labels, LabelsNum, parser);
             return c;
         }
 
-        private String TranslateToText(Block Block0, Block CurrBlock)
+        private int GetParamsNum()
         {
             switch (CommandType)
             {
-                case 1: //Pushes to stack
-                    Data = Utilities.ToInt3IntsSigned(X, Y, Z);
-                    return "[PUSH " + Data + "]";
-                case 0:
-                    return "[GET " + Utilities.ToInt2IntsSigned(Y, Z) + ", " + X + " FROM STACK]";
                 case 3:
-                    return "[COPY " + Utilities.ToInt2Ints(Y, Z) + ", " + X + " TO STACK]";
-                case 9:
-                    return "[END " + Utilities.ToInt3Ints(X, Y, Z) + "]";
-                case 0xB:
-                    return "[INCREMENT STACK POINTER BY " + Utilities.ToInt3Ints(X, Y, Z) + "]";
-                case 0x5:
-                    return "[JUMP TO 0-" + Block0.Number[Utilities.ToInt2Ints(Y, Z)] + ", " + X + "]";
-                case 0x7:
-                    return "[JUMP TO " + CurrBlock.BlockNum + "-" + CurrBlock.Number[Utilities.ToInt2Ints(Y, Z)] + ", " + X + "]";
+                    return 1;
                 case 0xD:
-                    NumParam = 1;
-                    return "(IF $1 == 0, GO TO " + CurrBlock.BlockNum + "-" + CurrBlock.Number[Utilities.ToInt2Ints(Y, Z)] + ")";
-                case 6:
-                    return "[RETURN AND DECREMENT STACK POINTER BY " + Utilities.ToInt2Ints(Y, Z) + ", " + X + "]";
-                case 8:
-                    return "[RETURN " + Utilities.ToInt2Ints(Y, Z) + ", " + X + "]";
-                case 0xC:
-                    return "[GO TO " + CurrBlock.BlockNum + "-" + CurrBlock.Number[Utilities.ToInt2Ints(Y, Z)] + "]";
+                    return 1;
                 case 4: // 04 extended codes
-                    NumParam = ExtendedCodeParams.ExtCodeParams[Utilities.ToInt2Ints(Y, Z)];
-                    switch (Utilities.ToInt2Ints(Y, Z))
-                    {
-                        case 0x00:
-                            return "(DELAY PARSING BY $1)";
-                        case 0x03:
-                            return "(LOAD SCRIPT " + CurrBlock.BlockNum + "-$1)";
-                        case 0x0A:
-                            return "(SET EVENT FLAG $2 TO $1)";
-                        case 0x0B:
-                            return "(SET BYTE SRAM1 + $2 TO $1)";
-                        case 0x0E:
-                            return "(LOAD BYTE SRAM1 + $1)";
-                        case 0x0C:
-                            return "(SET BYTE SRAM2 + $2 TO $1)";
-                        case 0x0D:
-                            return "(PUSH EVENT FLAG $1)";
-                        case 0x1E:
-                            return "(ADD CHAR $1)";
-                        case 0x1F:
-                            return "(REMOVE CHAR $1)";
-                        case 0x33: //Display from bank 0
-                            return "(DISPLAY 0-$1, $2, ^$3)";
-                        case 0x32: //Display from bank we're in
-                            if(CurrBlock.BlockNum == 0)
-                                return "(DISPLAY CALLER-$1, $2, ^$3)";
-                            return "(DISPLAY " + CurrBlock.BlockNum + "-$1, $2, ^$3)";
-                        case 0x36:
-                            return "(PUSH MENU SELECTION)";
-                        case 0x77:
-                            return "(STOP SCREEN SHAKING)";
-                        case 0x83:
-                            return "(PLAY SOUND $2, $1)";
-                        case 0x8C:
-                            return "(START BATTLE AGAINST $1)";
-                        case 0xA0:
-                            return "(OPEN UP SHOP MENU $2, $1)";
-                        case 0xA1:
-                            return "(OPEN UP SAVING MENU)";
-                        case 0xA2:
-                            return "(OPEN UP NAMING MENU $1)";
-                        case 0xA3:
-                            return "(CHECK $1'S FAKE NAME)";
-                        case 0xA4:
-                            return "(OPEN ITEM GUY MENU)";
-                        case 0xA5:
-                            return "(OPEN MONEY MENU)";
-                        case 0xAA:
-                            return "(RESTART THE GAME)";
-                        case 0xB5:
-                            return "(LOAD SPRITE TABLE $1)";
-                        case 0xEC:
-                            return "(PUSH CHARACTER $1'S LEVEL)";
-                        case 0xF6:
-                            return "(START STAFF ROLL)";
-                        default:
-                            string tmp = "(" + Utilities.ToHex(CommandType, 2) + " " + Utilities.ToHex(x, 2) + " " + Utilities.ToHex(y, 2) + " " + Utilities.ToHex(z, 2);
-                            if (NumParam > 0)
-                                tmp += " |";
-                            for (int i = 0; i < NumParam; i++)
-                            {
-                                tmp += " $" + (i + 1);
-                                if (i != NumParam - 1)
-                                    tmp += ",";
-                            }
-                            return tmp + ")";
-                    }
+                    return ExtendedCodeParams.ExtCodeParams[Utilities.ToInt2Ints(Y, Z)];
                 case 0xE: // 0E extended Math codes
                     switch (X)
                     {
                         case 0x00: //-$1
-                            NumParam = 1;
-                            return "(PUSH -$1)";
+                            return 1;
                         case 0x1://$1+$2
-                            NumParam = 2;
-                            return "(PUSH $2 + $1)";
+                            return 2;
                         case 0x2://$2-$1
-                            NumParam = 2;
-                            return "(PUSH $2 - $1)";
+                            return 2;
                         case 0x3://$1*$2
-                            NumParam = 2;
-                            return "(PUSH $2 * $1)";
+                            return 2;
                         case 0x4://$2/$1
-                            NumParam = 2;
-                            return "(PUSH $2 / $1)";
+                            return 2;
                         case 0x5://$2%$1
-                            NumParam = 2;
-                            return "(PUSH $2 % $1)";
+                            return 2;
                         case 0x6://$1++
-                            NumParam = 1;
-                            return "(PUSH $1 + 1)";
+                            return 1;
                         case 0x7://$1--
-                            NumParam = 1;
-                            return "(PUSH $1 - 1)";
+                            return 1;
                         case 0x8://$1&$2
-                            NumParam = 2;
-                            return "(PUSH $1 & $2)";
+                            return 2;
                         case 0x9://$1|$2
-                            NumParam = 2;
-                            return "(PUSH $1 | $2)";
+                            return 2;
                         case 0xA:// If $1 == $2
-                            NumParam = 2;
-                            return "(PUSH $1 == $2)";
+                            return 2;
                         case 0xB:// If $1 != $2
-                            NumParam = 2;
-                            return "(PUSH $1 != $2)";
+                            return 2;
                         case 0xC:// If $1 > $2
-                            NumParam = 2;
-                            return "(PUSH $1 > $2)";
+                            return 2;
                         case 0xD:// If $1 < $2
-                            NumParam = 2;
-                            return "(PUSH $1 < $2)";
+                            return 2;
                         case 0xE:// If $1 >= $2
-                            NumParam = 2;
-                            return "(PUSH $1 >= $2)";
+                            return 2;
                         case 0xF:// If $1 <= $2
-                            NumParam = 2;
-                            return "(PUSH $1 <= $2)";
-                        case 0x10:// Copy $1
-                            NumParam = 1;
-                            return "(PUSH $1 AGAIN)";
+                            return 2;
                         case 0x11:
-                            return "[DECREMENT STACK POINTER BY 1]";
+                            return 1;
                         case 0x12:
-                            return "[DECREMENT STACK POINTER BY 1]";
-                        case 0x13:
-                            return "[NOP]";
-                        default:
-                            break;
+                            return 1;
                     }
                     break;
                 default:
                     break;
             }
-            return null;
+            return 0;
         }
 
-        private String TranslateToText(Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels)
+        private String TranslateToText(Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, Parser parser)
         {
             switch (CommandType)
             {
@@ -502,194 +242,32 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                         Labels[Branch] = LabelsNum++;
                     return "[GO TO " + CurrBlock.BlockNum + "-" + CurrBlock.GraphAssociatedToBlock[Graph.Top.Start] + "-" + Labels[Branch] + "]";
                 default:
-                    return TranslateToText(Block0, CurrBlock);
+                    return parser.TranslateToText(this);
             }
         }
 
-        public String InsertPreviousCommand(List<int> DataList, String t, List<string> tmp, bool Graph)
-        {
-            if (this.NumParam != 0)
-            {
-                for (int i = 1; i <= this.NumParam && DataList.Count - i >= 0; i++)
-                {
-                    int tempData = DataList[DataList.Count - i];
-                    if (tempData == SingleCommand.ImpossibleData)
-                    {
-                        t = t.Replace("^$" + i, tmp[tmp.Count - i]);
-                        t = t.Replace("$" + i, tmp[tmp.Count - i]);
-                    }
-                    else
-                    {
-                        if ((tempData <= -1) && this.CommandType == 4 && (this.Y == 0x32 || this.Y == 0x33))
-                        {
-                            if (tempData == -1)
-                                t = t.Replace("^$" + i, "SPEAKER");
-                            else if (tempData == -2)
-                                t = t.Replace("^$" + i, "TEAM LEADER");
-                            else if (tempData == -3)
-                                t = t.Replace("^$" + i, "SPEAKER, NO GREY BAR");
-                            else if (tempData < 0)
-                                t = t.Replace("^$" + i, "???");
-                            else
-                                t = t.Replace("^$" + i, "CHARACTER " + tempData);
-                        }
-                        if (this.CommandType == 4 && this.Y == 0xA3)
-                            t = tempData == 0 ? t.Replace("$" + i, "DUSTER") : tempData == 2 ? t.Replace("$" + i, "KUMATORA") : t;
-                        if (this.CommandType == 4 && this.Y == 3)
-                            t = t.Replace("$" + i, (tempData + 5).ToString());
-                        t = t.Replace("$" + i, tempData.ToString());
-                    }
-                    if(Graph)
-                        t = t.Replace(Environment.NewLine, "");
-                }
-                if (!(this.CommandType == 0xE && this.X == 0x10))
-                {
-                    tmp.RemoveRange(Math.Max(tmp.Count - this.NumParam, 0), Math.Min(this.NumParam, tmp.Count));
-                    DataList.RemoveRange(Math.Max(DataList.Count - this.NumParam, 0), Math.Min(this.NumParam, DataList.Count));
-                }
-            }
-            return t;
-        }
-
-        public int CommandType
-        {
-            get
-            {
-                return commandType;
-            }
-
-            set
-            {
-                commandType = value;
-            }
-        }
-
-        public int X
-        {
-            get
-            {
-                return x;
-            }
-
-            set
-            {
-                x = value;
-            }
-        }
-
-        public int Y
-        {
-            get
-            {
-                return y;
-            }
-
-            set
-            {
-                y = value;
-            }
-        }
-
-        public int Z
-        {
-            get
-            {
-                return z;
-            }
-
-            set
-            {
-                z = value;
-            }
-        }
-
-        public string Command
-        {
-            get
-            {
-                return command;
-            }
-
-            set
-            {
-                command = value;
-            }
-        }
-
-        public int NumParam
-        {
-            get
-            {
-                return numParam;
-            }
-
-            set
-            {
-                numParam = value;
-            }
-        }
-
-        public int Data
-        {
-            get
-            {
-                return data;
-            }
-
-            set
-            {
-                data = value;
-            }
-        }
-
-        public int LabelsNum
-        {
-            get
-            {
-                return labelsNum;
-            }
-
-            set
-            {
-                labelsNum = value;
-            }
-        }
-
+        public int CommandType { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int Z { get; set; }
+        public string Command { get; set; }
+        public int NumParam { get; set; }
+        public int Data { get; set; }
+        public int LabelsNum { get; set; }
         public int PointedEntry { get => pointedEntry; set => pointedEntry = value; }
     }
     class ExtendedCodeParams
     {
-        private static int[] extCodeParams;
-
-        public static int[] ExtCodeParams
-        {
-            get
-            {
-                return extCodeParams;
-            }
-
-            set
-            {
-                extCodeParams = value;
-            }
-        }
+        public static int[] ExtCodeParams { get; set; }
     }
     class Block
     {
         private const int MAXBLOCKS = 0x4000;
         private int blockBeginning;
-        private BlockStatus[] status;
-        private int[] number;
-        private int[] commandNum;
-        private int[] graphAssociatedToBlock;
-        private int[] blockAssociatedToGraph;
-        private bool[] externalFunction;
         private bool[] mainCaller;
         private bool[] special;
         private bool[] fifteenth_bit;
-        private int[] referencesTo;
-        private int entryNum;
-        private int blockNum;
+
         public Block(int blockBeginning) : this(0, blockBeginning)
         {
         }
@@ -756,710 +334,21 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 this.ReferencesTo[Branch]++;
         }
 
-        public int[] ReferencesTo
-        {
-            get
-            {
-                return referencesTo;
-            }
-
-            set
-            {
-                referencesTo = value;
-            }
-        }
-
-        internal BlockStatus[] Status
-        {
-            get
-            {
-                return status;
-            }
-
-            set
-            {
-                status = value;
-            }
-        }
-
-        public int[] Number
-        {
-            get
-            {
-                return number;
-            }
-
-            set
-            {
-                number = value;
-            }
-        }
-
-        public int[] CommandNum
-        {
-            get
-            {
-                return commandNum;
-            }
-
-            set
-            {
-                commandNum = value;
-            }
-        }
-
-        public int EntryNum
-        {
-            get
-            {
-                return entryNum;
-            }
-
-            set
-            {
-                entryNum = value;
-            }
-        }
-
-        public int BlockNum
-        {
-            get
-            {
-                return blockNum;
-            }
-
-            set
-            {
-                blockNum = value;
-            }
-        }
-
-        public bool[] ExternalFunction
-        {
-            get
-            {
-                return externalFunction;
-            }
-
-            set
-            {
-                externalFunction = value;
-            }
-        }
-
-        public int[] GraphAssociatedToBlock
-        {
-            get
-            {
-                return graphAssociatedToBlock;
-            }
-
-            set
-            {
-                graphAssociatedToBlock = value;
-            }
-        }
-
-        public int[] BlockAssociatedToGraph
-        {
-            get
-            {
-                return blockAssociatedToGraph;
-            }
-
-            set
-            {
-                blockAssociatedToGraph = value;
-            }
-        }
-
+        public int[] ReferencesTo { get; set; }
+        internal BlockStatus[] Status { get; set; }
+        public int[] Number { get; set; }
+        public int[] CommandNum { get; set; }
+        public int EntryNum { get; set; }
+        public int BlockNum { get; set; }
+        public bool[] ExternalFunction { get; set; }
+        public int[] GraphAssociatedToBlock { get; set; }
+        public int[] BlockAssociatedToGraph { get; set; }
         public bool[] MainCaller { get => mainCaller; set => mainCaller = value; }
         public bool[] Special { get => special; set => special = value; }
         public bool[] Fifteenth_bit { get => fifteenth_bit; set => fifteenth_bit = value; }
         public int BlockBeginning { get => blockBeginning; set => blockBeginning = value; }
     }
-    class BlockNode
-    {
-        private BlockNode father, lChild, rChild, rReference, lReference, topOfSubGraph;
-        private List<BlockNode> otherFathers;
-        private int start, end, insideReferences, depth, indexInLinearizedGraph;
-        private Else elseIn;
-        private List<int> openParenthesisAt, closeParenthesisAt;
-        private Cycle cycleIn;
-        private List<BlockNode> openParenthesisAtConnectedTo, closeParenthesisAtConnectedTo, goToBlock;
-        private bool lOtherGraph, rOtherGraph;
-        private BranchType branch;
 
-        public BlockNode(int start) : this(start, -1, 0, null, 0, null)
-        {
-        }
-
-        public BlockNode(int start, int depth, BlockNode TopSub) : this(start, -1, 0, null, depth, TopSub)
-        {
-        }
-
-        public BlockNode(int start, BlockNode father, int depth, BlockNode TopSub) : this(start, -1, 0, father, depth, TopSub)
-        {
-        }
-
-        public BlockNode(int start, int end, BlockNode father, int depth, BlockNode TopSub) : this(start, end, 0, father, depth, TopSub)
-        {
-        }
-
-        public BlockNode(int start, int end, int insideReferences, BlockNode father, int depth, BlockNode TopSub)
-        {
-            Father = father;
-            Start = start;
-            End = end;
-            InsideReferences = insideReferences;
-            Depth = depth;
-            IndexInLinearizedGraph = 0;
-            RReference = null;
-            LReference = null;
-            CycleIn = null;
-            ElseIn = null;
-            OpenParenthesisAt = new List<int>();
-            CloseParenthesisAt = new List<int>();
-            OpenParenthesisAtConnectedTo = new List<BlockNode>();
-            GoToBlock = new List<BlockNode>();
-            CloseParenthesisAtConnectedTo = new List<BlockNode>();
-            TopOfSubGraph = TopSub;
-            LChild = null;
-            RChild = null;
-            LOtherGraph = false;
-            ROtherGraph = false;
-            Branch = BranchType.NaB;
-            OtherFathers = new List<BlockNode>();
-        }
-
-        public BlockNode MakeRChild(int blockCommand, int NextDeepness)
-        {
-            this.End = blockCommand - 1;
-            this.RChild = new BlockNode(blockCommand, this, NextDeepness, this.TopOfSubGraph);
-            return this.RChild;
-        }
-
-        public BlockNode MakeLChild(int Branch, int NextDeepness)
-        {
-            this.LChild = new BlockNode(Branch, this, NextDeepness, null);
-            this.LChild.TopOfSubGraph = this.LChild;
-            return this.LChild;
-        }
-
-        public void UpdateOpenParenthesis(BlockNode Destination, int Value)
-        {
-            this.OpenParenthesisAt.Add(Value);
-            this.OpenParenthesisAtConnectedTo.Add(Destination);
-        }
-
-        public void UpdateCloseParenthesis(BlockNode Source, int Value)
-        {
-            this.CloseParenthesisAt.Add(Value);
-            this.CloseParenthesisAtConnectedTo.Add(Source);
-        }
-
-        public int End
-        {
-            get
-            {
-                return end;
-            }
-
-            set
-            {
-                end = value;
-            }
-        }
-
-        public int InsideReferences
-        {
-            get
-            {
-                return insideReferences;
-            }
-
-            set
-            {
-                insideReferences = value;
-            }
-        }
-
-        public int Start
-        {
-            get
-            {
-                return start;
-            }
-
-            set
-            {
-                start = value;
-            }
-        }
-
-        internal BlockNode Father
-        {
-            get
-            {
-                return father;
-            }
-
-            set
-            {
-                father = value;
-            }
-        }
-
-        internal BlockNode LChild
-        {
-            get
-            {
-                return lChild;
-            }
-
-            set
-            {
-                lChild = value;
-            }
-        }
-
-        internal BlockNode RChild
-        {
-            get
-            {
-                return rChild;
-            }
-
-            set
-            {
-                rChild = value;
-            }
-        }
-
-        internal BranchType Branch
-        {
-            get
-            {
-                return branch;
-            }
-
-            set
-            {
-                branch = value;
-            }
-        }
-
-        public int Depth
-        {
-            get
-            {
-                return depth;
-            }
-
-            set
-            {
-                depth = value;
-            }
-        }
-
-        internal BlockNode RReference
-        {
-            get
-            {
-                return rReference;
-            }
-
-            set
-            {
-                rReference = value;
-            }
-        }
-
-        internal BlockNode LReference
-        {
-            get
-            {
-                return lReference;
-            }
-
-            set
-            {
-                lReference = value;
-            }
-        }
-
-        internal BlockNode TopOfSubGraph
-        {
-            get
-            {
-                return topOfSubGraph;
-            }
-
-            set
-            {
-                topOfSubGraph = value;
-            }
-        }
-
-        public bool LOtherGraph
-        {
-            get
-            {
-                return lOtherGraph;
-            }
-
-            set
-            {
-                lOtherGraph = value;
-            }
-        }
-
-        public bool ROtherGraph
-        {
-            get
-            {
-                return rOtherGraph;
-            }
-
-            set
-            {
-                rOtherGraph = value;
-            }
-        }
-
-        public List<int> OpenParenthesisAt
-        {
-            get
-            {
-                return openParenthesisAt;
-            }
-
-            set
-            {
-                openParenthesisAt = value;
-            }
-        }
-
-        public List<int> CloseParenthesisAt
-        {
-            get
-            {
-                return closeParenthesisAt;
-            }
-
-            set
-            {
-                closeParenthesisAt = value;
-            }
-        }
-
-        internal List<BlockNode> OtherFathers
-        {
-            get
-            {
-                return otherFathers;
-            }
-
-            set
-            {
-                otherFathers = value;
-            }
-        }
-
-        internal List<BlockNode> OpenParenthesisAtConnectedTo
-        {
-            get
-            {
-                return openParenthesisAtConnectedTo;
-            }
-
-            set
-            {
-                openParenthesisAtConnectedTo = value;
-            }
-        }
-
-        internal List<BlockNode> CloseParenthesisAtConnectedTo
-        {
-            get
-            {
-                return closeParenthesisAtConnectedTo;
-            }
-
-            set
-            {
-                closeParenthesisAtConnectedTo = value;
-            }
-        }
-
-        public int IndexInLinearizedGraph
-        {
-            get
-            {
-                return indexInLinearizedGraph;
-            }
-
-            set
-            {
-                indexInLinearizedGraph = value;
-            }
-        }
-
-        internal List<BlockNode> GoToBlock
-        {
-            get
-            {
-                return goToBlock;
-            }
-
-            set
-            {
-                goToBlock = value;
-            }
-        }
-
-        internal Cycle CycleIn
-        {
-            get
-            {
-                return cycleIn;
-            }
-
-            set
-            {
-                cycleIn = value;
-            }
-        }
-
-        internal Else ElseIn
-        {
-            get
-            {
-                return elseIn;
-            }
-
-            set
-            {
-                elseIn = value;
-            }
-        }
-    }
-    class FullGraph
-    {
-        private BlockNode top;
-        private List<BlockNode> linearizedGraph;
-        private List<BlockNode> bottoms;
-
-        public FullGraph(BlockNode top)
-        {
-            Top = top;
-            LinearizedGraph = new List<BlockNode>();
-            Bottoms = new List<BlockNode>();
-        }
-
-        public void GetParenthesis()
-        {
-            MakeLinearizedGraph(Top);
-            foreach (BlockNode Bottom in bottoms)
-            {
-                BlockNode Destination = Bottom;
-                //UpdateParenthesisTopBottom(Destination, Bottom.TopOfSubGraph);
-                while (Destination != null && Destination.OtherFathers.Count() == 0)
-                {
-                    Destination = Destination.Father;
-                }
-                if (Destination != null)
-                {
-                    for (int i = 0; i < Destination.OtherFathers.Count(); i++)
-                    {
-                        BlockNode Objective = Destination;
-                        BlockNode Source = Destination.OtherFathers[i];
-                        BlockNode Common = Source;
-                        while (Common != null && Common.TopOfSubGraph != Destination.TopOfSubGraph)
-                            Common = Common.TopOfSubGraph.Father;
-                        if(Common != null)
-                        {
-                            if (Common.Depth == Destination.Depth)
-                            {
-                                if (Common.IndexInLinearizedGraph >= Destination.IndexInLinearizedGraph && Common.CycleIn == Destination.CycleIn)
-                                {
-                                    bool DoWhile = true;
-                                    if (Source.RReference != null)
-                                    {
-                                        while (Destination.LChild == null && Destination.LReference == null)
-                                            Destination = Destination.RChild;
-                                        DoWhile = false;
-                                        if (Destination.RChild.IndexInLinearizedGraph > Source.IndexInLinearizedGraph && Destination.LChild != null)
-                                            Destination = Destination.LChild;
-                                        else
-                                            Destination = Destination.RChild;
-                                        UpdateParenthesisIfElseDoWhile(Common, Destination);
-                                        if(Common.RChild != null)
-                                            new Cycle(Destination.Father, Destination, Objective, Common, Common.RChild, LinearizedGraph, DoWhile);
-                                        else
-                                            new Cycle(Destination.Father, Destination, Objective, Common, Common.RReference, LinearizedGraph, DoWhile);
-                                    }
-                                    else
-                                    {
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            foreach (BlockNode Bottom in bottoms)
-            {
-                BlockNode Destination = Bottom;
-                UpdateParenthesisTopBottom(Destination, Bottom.TopOfSubGraph);
-                while (Destination != null && Destination.OtherFathers.Count() == 0)
-                {
-                    Destination = Destination.Father;
-                }
-                if (Destination != null)
-                {
-                    for (int i = 0; i < Destination.OtherFathers.Count(); i++)
-                    {
-                        BlockNode Source = Destination.OtherFathers[i];
-                        BlockNode Common = Source;
-                        while (Common != null && Common.TopOfSubGraph != Destination.TopOfSubGraph)
-                        {
-                            Common = Common.TopOfSubGraph.Father;
-                        }
-                        if (Common == null)
-                            Source.GoToBlock.Add(Destination);
-                        else
-                        {
-                            if (Common.Depth == Destination.Father.Depth)
-                            {
-                                if (Common.CycleIn != Destination.Father.CycleIn)
-                                {
-                                    Source.GoToBlock.Add(Destination);
-                                }
-                                else if (Common.IndexInLinearizedGraph < Destination.IndexInLinearizedGraph)
-                                {
-                                    UpdateParenthesisIfElseDoWhile(Destination.Father, Common.RChild);
-                                    if (Source != Common)
-                                        new Else(Common.RChild, Destination.Father, Destination, LinearizedGraph);
-                                }
-                            }
-                            else
-                            {
-                                Source.GoToBlock.Add(Destination);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private void UpdateParenthesisIfElseDoWhile(BlockNode Destination, BlockNode Common)
-        {
-            UpdateDepthFrom(Destination, Common);
-            if (Destination.RChild != null)
-            {
-                Common.UpdateOpenParenthesis(Destination.RChild, 0);
-                Destination.RChild.UpdateCloseParenthesis(Common, 0);
-            }
-            else
-            {
-                Common.UpdateOpenParenthesis(Destination, 0);
-                Destination.UpdateCloseParenthesis(Common, 4);
-            }
-        }
-
-        private void UpdateParenthesisTopBottom(BlockNode Destination, BlockNode Common)
-        {
-
-            UpdateDepthFrom(Destination, Common);
-            UpdateDepth(Common.LChild);
-            Common.UpdateOpenParenthesis(Destination, 0);
-            Destination.UpdateCloseParenthesis(Common, 4);
-        }
-
-        private void MakeLinearizedGraph(BlockNode TMP)
-        {
-            while (TMP != null)
-            {
-                LinearizedGraph.Add(TMP);
-                TMP.IndexInLinearizedGraph = LinearizedGraph.Count - 1;
-                TMP.Depth = 0;
-                if (TMP.LChild != null)
-                    MakeLinearizedGraph(TMP.LChild);
-                TMP = TMP.RChild;
-            }
-        }
-
-        private void UpdateDepth(BlockNode TMP)
-        {
-            while (TMP != null)
-            {
-                TMP.Depth++;
-                if (TMP.LChild != null)
-                    UpdateDepth(TMP.LChild);
-                TMP = TMP.RChild;
-            }
-        }
-
-        private void UpdateDepthFrom(BlockNode Destination, BlockNode Source)
-        {
-            if (Destination.RChild != null)
-            {
-                for (int i = Source.IndexInLinearizedGraph; i < Destination.RChild.IndexInLinearizedGraph; i++)
-                {
-                    LinearizedGraph[i].Depth++;
-                }
-            }
-            else
-            {
-                for (int i = Source.IndexInLinearizedGraph; i <= Destination.IndexInLinearizedGraph ; i++)
-                {
-                    LinearizedGraph[i].Depth++;
-                }
-            }
-            UpdateDepth(Destination.LChild);
-        }
-
-        internal BlockNode Top
-        {
-            get
-            {
-                return top;
-            }
-
-            set
-            {
-                top = value;
-            }
-        }
-
-        internal List<BlockNode> Bottoms
-        {
-            get
-            {
-                return bottoms;
-            }
-
-            set
-            {
-                bottoms = value;
-            }
-        }
-
-        internal List<BlockNode> LinearizedGraph
-        {
-            get
-            {
-                return linearizedGraph;
-            }
-
-            set
-            {
-                linearizedGraph = value;
-            }
-        }
-    }
     class Program
     {
         static void PreProcessSingleEntry(byte[] Data, Block Block0, Block CurrBlock, int CurrEntryNum, int Block0Logic, int EntryLogic)
@@ -1754,14 +643,14 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             return CurrBlockGraph;
         }
 
-        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Tree, bool Linear)
+        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Tree, bool Linear, ResourcesList resList)
         {
             if (Linear)
-                return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0);
-            return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, Tree);
+                return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, resList);
+            return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, Tree, resList);
         }
 
-        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0)
+        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, ResourcesList resList)
         {
             int NumElem = CurrBlock.EntryNum;
             List<String> ReadGameLogic = new List<string>();
@@ -1790,12 +679,12 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                         }
                         while (argsStack.Count > 0);*/
                         string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null));
+                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
                     }
                     else
                     {
                         string basis = CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null));
+                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
                     }
                 }
                 else
@@ -1818,34 +707,35 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                         }
                         while (argsStack.Count > 0);*/
                         string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null));
+                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
                     }
                     else
                     {
                         string basis = CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null));
+                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
                     }
                 }
             }
             return ReadGameLogic.ToArray();
         }
 
-        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Graph)
+        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Graph, ResourcesList resList)
         {
             int NumElem = Graph.Count;
             string[] ReadGameLogic = new string[NumElem];
             for (int i = 0; i < NumElem; i++)
             {
                 ReadGameLogic[i] = CurrBlock.BlockNum + "-" + i + ":" + Environment.NewLine;
-                ReadGameLogic[i] += ReadGameLogicSingleEntry(Data, CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, Graph[i].Top, Graph[i]);
+                ReadGameLogic[i] += ReadGameLogicSingleEntry(Data, CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, Graph[i].Top, Graph[i], resList);
             }
             return ReadGameLogic;
         }
 
-        static string ReadGameLogicSingleEntry(byte[] Data, int start, int bank, int num, Block CurrBlock, Block Block0, List<Arguments> argsStack)
+        static string ReadGameLogicSingleEntry(byte[] Data, int start, int bank, int num, Block CurrBlock, Block Block0, List<Arguments> argsStack, ResourcesList resList)
         {
             List<string> tmp = new List<string>();
             List<int> DataList = new List<int>();
+            Parser parser = new Parser(Block0, CurrBlock, resList, DataList, tmp);
             bool[] visitedBlock = new bool[CurrBlock.EntryNum];
             for (int i = 0; i < visitedBlock.Length; i++)
                 visitedBlock[i] = false;
@@ -1853,13 +743,13 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             List<int> returningStack = new List<int>();
             if (argsStack == null)
                 returningStack = null;
-            return ReadGameLogicSingleEntry(Data, start, bank, CurrBlock, Block0, tmp, DataList, numblock, visitedBlock, returningStack, argsStack);
+            return ReadGameLogicSingleEntry(Data, start, bank, CurrBlock, Block0, tmp, DataList, numblock, visitedBlock, returningStack, argsStack, parser);
         }
 
-        static string ReadGameLogicSingleEntry(Arguments arguments, List<Arguments> argsStack)
-        { return ReadGameLogicSingleEntry(arguments.Data, arguments.start, arguments.bank, arguments.CurrBlock, arguments.Block0, arguments.tmp, arguments.DataList, arguments.numblock, arguments.visitedBlock, arguments.returningStack, argsStack); }
+        static string ReadGameLogicSingleEntry(Arguments arguments, List<Arguments> argsStack, ResourcesList resList)
+        { return ReadGameLogicSingleEntry(arguments.Data, arguments.start, arguments.bank, arguments.CurrBlock, arguments.Block0, arguments.tmp, arguments.DataList, arguments.numblock, arguments.visitedBlock, arguments.returningStack, argsStack, new Parser(arguments.Block0, arguments.CurrBlock, resList, arguments.DataList, arguments.tmp)); }
 
-        static string ReadGameLogicSingleEntry(byte[] Data, int start, int bank, Block CurrBlock, Block Block0, List<string>tmp, List<int> DataList, int numblock, bool[] visitedBlock, List<int> returningStack, List<Arguments> argsStack)
+        static string ReadGameLogicSingleEntry(byte[] Data, int start, int bank, Block CurrBlock, Block Block0, List<string>tmp, List<int> DataList, int numblock, bool[] visitedBlock, List<int> returningStack, List<Arguments> argsStack, Parser parser)
         {
             bool end = false;
             int tmpNumBlock;
@@ -1868,7 +758,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             {
                 if (CurrBlock.Status[numblock] == BlockStatus.start)
                     visitedBlock[CurrBlock.Number[numblock]] = true;
-                SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, DataList, tmp);
+                SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, parser);
                 if(argsStack != null)
                     if (c.CommandType == 0xD || c.CommandType == 0xC || c.CommandType == 8 || c.CommandType == 7)
                         tmp.Remove(tmp[tmp.Count - 1]);
@@ -1947,10 +837,11 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             return tmp2;
         }
 
-        static string ReadGameLogicSingleEntry(byte[] Data, int Pointer, int bank, int num, Block CurrBlock, Block Block0, BlockNode Zone, FullGraph Graph)
+        static string ReadGameLogicSingleEntry(byte[] Data, int Pointer, int bank, int num, Block CurrBlock, Block Block0, BlockNode Zone, FullGraph Graph, ResourcesList resList)
         {
             List<string> tmp = new List<string>();
             List<int> DataList = new List<int>();
+            Parser parser = new Parser(Block0, CurrBlock, resList, DataList, tmp);
             int[] Labels = new int[0x10000];
             for (int i = 0; i < 0x10000; i++)
                 Labels[i] = -1;
@@ -1998,7 +889,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 }
                 while (numblock <= Zone.End)
                 {
-                    SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, DataList, tmp, Zone, Graph, Labels, LabelsNum);
+                    SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, DataList, tmp, Zone, Graph, Labels, LabelsNum, parser);
                     LabelsNum = c.LabelsNum;
                     numblock++;
                     start += 4;
@@ -2042,7 +933,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             while (Zone != null && Zone != Graph.Top);
             string tmp2 = "";
             for (int i = 0; i < tmp.Count; i++)
-                tmp2 += tmp[i];
+                tmp2 += tmp[i] + (tmp[i].EndsWith(Environment.NewLine) ? "" : Environment.NewLine);
             return tmp2;
         }
 
@@ -2060,6 +951,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
             {
                 extendedCodeParameters[i] = Utilities.ToInt4Bytes(Data, paramAddress + (i * 4));
             }
+            ResourcesList resList = ResourcesList.readResources();
             ExtendedCodeParams.ExtCodeParams = extendedCodeParameters;
             const int baseaddress = 0x1198C10;
             int numentries = Utilities.ToInt4Bytes(Data, baseaddress)/2;
@@ -2091,7 +983,7 @@ namespace ConsoleApplication11 //Decompile Game Logic Table
                 if (entriespointers[i].Logic != baseaddress && entriespointers[i].Pointers != baseaddress)
                 {
                     Graph = PreProcessEntries(Data, ref entriespointers[i], ref entriespointers[0], Block0, CurrBlock, Linear);
-                    ConvertedEntries[i].AddRange(ReadGameLogicEntries(Data, entriespointers[i], CurrBlock, Block0, Graph, Linear));
+                    ConvertedEntries[i].AddRange(ReadGameLogicEntries(Data, entriespointers[i], CurrBlock, Block0, Graph, Linear, resList));
                 }
                 if (i == 0)
                     i = numentries;

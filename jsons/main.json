@@ -1,0 +1,17 @@
+{
+   "0": "[GET STACK \\int2ints(Y, Z), \\int(X)]",
+   "1": "[PUSH \\int3ints(X, Y, Z)]",
+   "2": "[PUSH STACK \\int2ints(Y, Z), \\int(X)]",
+   "3": "[SET STACK \\int2ints(Y, Z), \\int(X) TO \\data(0)]",
+   "4": "\\extended(\\int2int(Y,Z))",
+   "5": "[JUMP TO 0-\\block0(Y, Z), PUSH STACK \\int(X)]",
+   "6": "[RETURN, DECREMENT STACK POINTER BY \\int2ints(Y, Z), GET STACK \\int(X)]",
+   "7": "[JUMP TO \\blocknum()-\\block(Y, Z), PUSH STACK \\int(X)]",
+   "8": "[RETURN, \\int2ints(Y, Z), \\int(X)]",
+   "9": "[END]",
+   "10": "[SET STACK 1, 0 TO \\int2ints(X, Y)]",
+   "11": "[INCREMENT STACK POINTER BY \\int3int(X, Y, Z)]",
+   "12": "[GO TO \\blocknum()-\\block(Y, Z)]",
+   "13": "(IF \\data(0) == 0, GO TO \\blocknum()-\\block(Y, Z))",
+   "14": "\\math(\\int(X))"
+}

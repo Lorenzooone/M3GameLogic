@@ -1,0 +1,57 @@
+[
+    {
+        "Name":"main",
+        "Command":"MAIN",
+        "Default":"[\\hex(O) \\hex(X) \\hex(Y) \\hex(Z)]"
+    },
+    {
+        "Name":"extended",
+        "Command":"extended",
+        "Default":"[\\hex(O) \\hex(X) \\hex(Y) \\hex(Z)\\extra()]"
+    },
+    {
+        "Name":"math",
+        "Command":"math",
+        "Default":"[\\hex(O) \\hex(X) \\hex(Y) \\hex(Z)]"
+    },
+    {
+        "Name":"ailments",
+        "Command":"ailment",
+        "Default":"AILMENT \\data()"
+    },
+    {
+        "Name":"animations",
+        "Command":"anim",
+        "Default":"ANIMATION \\data()"
+    },
+    {
+        "Name":"characters",
+        "Command":"char",
+        "Default":"PARTY CHARACTER \\data()"
+    },
+    {
+        "Name":"characters_alternate",
+        "Command":"alt",
+        "Default":"PARTY CHARACTER \\data() (\\alt(0) OR \\alt(2))"
+    },
+    {
+        "Name":"characters_alternate_names",
+        "Command":"altname",
+        "Default":"PARTY CHARACTER \\data()'S ALTERNATE NAME (\\altnames(0) OR \\altnames(2))"
+    },
+    {
+        "Name":"direction",
+        "Command":"direction",
+        "Default":"DIRECTION \\data()"
+    },
+    {
+        "Name":"fades",
+        "Command":"fade",
+        "Default":"\\data()"
+    },
+    {
+        "Name":"psi",
+        "Command":"psi",
+        "Default":"PSI \\data()"
+    }
+]

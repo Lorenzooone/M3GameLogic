@@ -1,0 +1,22 @@
+{
+    "0": "[PUSH \\neg(\\data(0))]",
+    "1": "[PUSH \\sum(\\data(1), \\data(0))]",
+    "2": "[PUSH \\sub(\\data(1), \\data(0))]",
+    "3": "[PUSH \\mul(\\data(1), \\data(0))]",
+    "4": "[PUSH \\div(\\data(1), \\data(0))]",
+    "5": "[PUSH \\mod(\\data(1), \\data(0))]",
+    "6": "[PUSH \\inc(\\data(0))]",
+    "7": "[PUSH \\dec(\\data(0))]",
+    "8": "[PUSH \\and(\\data(0), \\data(1))]",
+    "9": "[PUSH \\or(\\data(0), \\data(1))]",
+    "10": "[PUSH \\eq(\\data(0), \\data(1))]",
+    "11": "[PUSH \\neq(\\data(0), \\data(1))]",
+    "12": "[PUSH \\gt(\\data(0), \\data(1))]",
+    "13": "[PUSH \\lt(\\data(0), \\data(1))]",
+    "14": "[PUSH \\ge(\\data(0), \\data(1))]",
+    "15": "[PUSH \\le(\\data(0), \\data(1))]",
+    "16": "[PUSH \\data(0) AGAIN]",
+    "17": "[POP \\data(0)]",
+    "18": "[POP \\data(0)]",
+    "19": "[NOP]"
+}
