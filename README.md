@@ -5,7 +5,7 @@ It requires passing in input the path to the ROM.
 
 Standard output is fully working and goes to GameLogic.txt.
 
-The e option makes it expand the branches.
+The e option makes it expand the branches, which can be useful for analyzing every path some logic could take.
 
 To use it, type your path to the ROM and then "e", the output goes to GameLogicExpanded.txt.
 
