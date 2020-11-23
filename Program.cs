@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -35,6 +36,13 @@ namespace M3GameLogic //Decompile Game Logic Table
 
     class Utilities
     {
+        public static bool FromHex(string s, out int a)
+        {
+            a = 0;
+            if (!s.StartsWith("0x"))
+                return false;
+            return int.TryParse(s.Substring(2), System.Globalization.NumberStyles.HexNumber, CultureInfo.InvariantCulture, out a);
+        }
         public static string ToHex(int a, int numbers)
         {
             string tmp = "";
@@ -115,10 +123,10 @@ namespace M3GameLogic //Decompile Game Logic Table
             Data = ImpossibleData; //Impossible default value
         }
 
-        public SingleCommand(int CT, int X, int Y, int Z, Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum, Parser parser) : this(CT, X, Y, Z)
+        public SingleCommand(int CT, int X, int Y, int Z, Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum, Parser parser, List<int> dataValues, List<string> tmp) : this(CT, X, Y, Z)
         {
             this.LabelsNum = LabelsNum;
-                Command = TranslateToText(Block0, CurrBlock, Zone, Graph, Labels, parser);
+                Command = TranslateToText(Block0, CurrBlock, Zone, Graph, Labels, parser, dataValues, tmp);
         }
         
         override public String ToString()
@@ -130,20 +138,20 @@ namespace M3GameLogic //Decompile Game Logic Table
             else return Command;
         }
 
-        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, Parser parser)
+        public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, Parser parser, List<int> dataList, List<string> tmp)
         {
             SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3]);
             if (c.CommandType == 5)
                 c.PointedEntry = Block0.Number[Utilities.ToInt2Ints(c.Y, c.Z)];
             if (c.CommandType == 7 || c.CommandType == 0xC || c.CommandType == 0xD)
                 c.PointedEntry = CurrBlock.Number[Utilities.ToInt2Ints(c.Y, c.Z)];
-            parser.TranslateToText(c);
+            parser.TranslateToText(c, dataList, tmp);
             return c;
         }
 
         public static SingleCommand GetSingleCommand(Byte[] Data, int start, Block Block0, Block CurrBlock, List<int> DataList, List<String> tmp, BlockNode Zone, FullGraph Graph, int[] Labels, int LabelsNum, Parser parser)
         {
-            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3], Block0, CurrBlock, Zone, Graph, Labels, LabelsNum, parser);
+            SingleCommand c = new SingleCommand(Data[start], Data[start + 1], Data[start + 2], Data[start + 3], Block0, CurrBlock, Zone, Graph, Labels, LabelsNum, parser, DataList, tmp);
             return c;
         }
 
@@ -204,7 +212,7 @@ namespace M3GameLogic //Decompile Game Logic Table
             return 0;
         }
 
-        private String TranslateToText(Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, Parser parser)
+        private String TranslateToText(Block Block0, Block CurrBlock, BlockNode Zone, FullGraph Graph, int[] Labels, Parser parser, List<int> dataValues, List<string> tmp)
         {
             switch (CommandType)
             {
@@ -242,7 +250,7 @@ namespace M3GameLogic //Decompile Game Logic Table
                         Labels[Branch] = LabelsNum++;
                     return "[GO TO " + CurrBlock.BlockNum + "-" + CurrBlock.GraphAssociatedToBlock[Graph.Top.Start] + "-" + Labels[Branch] + "]";
                 default:
-                    return parser.TranslateToText(this);
+                    return parser.TranslateToText(this, dataValues, tmp);
             }
         }
 
@@ -643,14 +651,14 @@ namespace M3GameLogic //Decompile Game Logic Table
             return CurrBlockGraph;
         }
 
-        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Tree, bool Linear, ResourcesList resList)
+        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, List<FullGraph> Tree, bool Linear, bool Expanded, ResourcesList resList)
         {
             if (Linear)
-                return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, resList);
+                return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, Expanded, resList);
             return ReadGameLogicEntries(Data, CurrentBlock, CurrBlock, Block0, Tree, resList);
         }
 
-        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, ResourcesList resList)
+        static string[] ReadGameLogicEntries(byte[] Data, PointerCouple CurrentBlock, Block CurrBlock, Block Block0, bool Expanded, ResourcesList resList)
         {
             int NumElem = CurrBlock.EntryNum;
             List<String> ReadGameLogic = new List<string>();
@@ -663,23 +671,28 @@ namespace M3GameLogic //Decompile Game Logic Table
                     {
                         if (CurrBlock.MainCaller[i])
                             found = true;
-                        /*
-                        List<Arguments> argsStack = new List<Arguments>();
-                        string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        do
+                        if (Expanded)
                         {
-                            if (argsStack.Count == 0)
-                                ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, argsStack));
-                            else
+                            List<Arguments> argsStack = new List<Arguments>();
+                            string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
+                            do
                             {
-                                Arguments tmpArg = argsStack[argsStack.Count - 1];
-                                argsStack.RemoveAt(argsStack.Count - 1);
-                                ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(tmpArg, argsStack));
+                                if (argsStack.Count == 0)
+                                    ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, argsStack, resList));
+                                else
+                                {
+                                    Arguments tmpArg = argsStack[argsStack.Count - 1];
+                                    argsStack.RemoveAt(argsStack.Count - 1);
+                                    ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(tmpArg, argsStack, resList));
+                                }
                             }
+                            while (argsStack.Count > 0);
                         }
-                        while (argsStack.Count > 0);*/
-                        string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
+                        else
+                        {
+                            string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
+                            ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
+                        }
                     }
                     else
                     {
@@ -691,23 +704,29 @@ namespace M3GameLogic //Decompile Game Logic Table
                 {
                     if (CurrBlock.MainCaller[i])
                     {
-                        /*
-                        List<Arguments> argsStack = new List<Arguments>();
-                        string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        do
+                        if (Expanded)
                         {
-                            if (argsStack.Count == 0)
-                                ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, argsStack));
-                            else
+
+                            List<Arguments> argsStack = new List<Arguments>();
+                            string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
+                            do
                             {
-                                Arguments tmpArg = argsStack[argsStack.Count - 1];
-                                argsStack.RemoveAt(argsStack.Count - 1);
-                                ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(tmpArg, argsStack));
+                                if (argsStack.Count == 0)
+                                    ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, argsStack, resList));
+                                else
+                                {
+                                    Arguments tmpArg = argsStack[argsStack.Count - 1];
+                                    argsStack.RemoveAt(argsStack.Count - 1);
+                                    ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(tmpArg, argsStack, resList));
+                                }
                             }
+                            while (argsStack.Count > 0);
                         }
-                        while (argsStack.Count > 0);*/
-                        string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
-                        ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
+                        else
+                        {
+                            string basis = (CurrBlock.MainCaller[i] ? "C-" : "") + (CurrBlock.Special[i] ? "S-" : "") + (CurrBlock.Fifteenth_bit[i] ? "Fif-" : "") + CurrBlock.BlockNum.ToString() + "-" + i.ToString() + ": ";
+                            ReadGameLogic.Add(basis + ReadGameLogicSingleEntry(Data, (CurrBlock.CommandNum[i] * 4) + CurrentBlock.Logic, CurrBlock.BlockNum, i, CurrBlock, Block0, null, resList));
+                        }
                     }
                     else
                     {
@@ -735,7 +754,7 @@ namespace M3GameLogic //Decompile Game Logic Table
         {
             List<string> tmp = new List<string>();
             List<int> DataList = new List<int>();
-            Parser parser = new Parser(Block0, CurrBlock, resList, DataList, tmp);
+            Parser parser = new Parser(Block0, CurrBlock, resList);
             bool[] visitedBlock = new bool[CurrBlock.EntryNum];
             for (int i = 0; i < visitedBlock.Length; i++)
                 visitedBlock[i] = false;
@@ -747,7 +766,7 @@ namespace M3GameLogic //Decompile Game Logic Table
         }
 
         static string ReadGameLogicSingleEntry(Arguments arguments, List<Arguments> argsStack, ResourcesList resList)
-        { return ReadGameLogicSingleEntry(arguments.Data, arguments.start, arguments.bank, arguments.CurrBlock, arguments.Block0, arguments.tmp, arguments.DataList, arguments.numblock, arguments.visitedBlock, arguments.returningStack, argsStack, new Parser(arguments.Block0, arguments.CurrBlock, resList, arguments.DataList, arguments.tmp)); }
+        { return ReadGameLogicSingleEntry(arguments.Data, arguments.start, arguments.bank, arguments.CurrBlock, arguments.Block0, arguments.tmp, arguments.DataList, arguments.numblock, arguments.visitedBlock, arguments.returningStack, argsStack, new Parser(arguments.Block0, arguments.CurrBlock, resList)); }
 
         static string ReadGameLogicSingleEntry(byte[] Data, int start, int bank, Block CurrBlock, Block Block0, List<string>tmp, List<int> DataList, int numblock, bool[] visitedBlock, List<int> returningStack, List<Arguments> argsStack, Parser parser)
         {
@@ -758,10 +777,13 @@ namespace M3GameLogic //Decompile Game Logic Table
             {
                 if (CurrBlock.Status[numblock] == BlockStatus.start)
                     visitedBlock[CurrBlock.Number[numblock]] = true;
-                SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, parser);
-                if(argsStack != null)
+                SingleCommand c = SingleCommand.GetSingleCommand(Data, start, Block0, CurrBlock, parser, DataList, tmp);
+                if (argsStack != null)
                     if (c.CommandType == 0xD || c.CommandType == 0xC || c.CommandType == 8 || c.CommandType == 7)
+                    {
                         tmp.Remove(tmp[tmp.Count - 1]);
+                        DataList.Remove(DataList[DataList.Count - 1]);
+                    }
                 switch (c.CommandType)
                 {
                     case 0x7:
@@ -809,6 +831,7 @@ namespace M3GameLogic //Decompile Game Logic Table
                             {
                                 end = true;
                                 tmp.Add("[END]");
+                                DataList.Add(SingleCommand.ImpossibleData);
                             }
                             else
                             {
@@ -841,7 +864,7 @@ namespace M3GameLogic //Decompile Game Logic Table
         {
             List<string> tmp = new List<string>();
             List<int> DataList = new List<int>();
-            Parser parser = new Parser(Block0, CurrBlock, resList, DataList, tmp);
+            Parser parser = new Parser(Block0, CurrBlock, resList);
             int[] Labels = new int[0x10000];
             for (int i = 0; i < 0x10000; i++)
                 Labels[i] = -1;
@@ -962,8 +985,14 @@ namespace M3GameLogic //Decompile Game Logic Table
             entriespointers[0].Logic = Utilities.ToInt4Bytes(Data, baseaddress + 8) + baseaddress;
             Block Block0 = new Block(entriespointers[0].Logic);
             bool Linear = true;
-            if (args.Count() >1 && args[1].Equals("g"))
-                Linear = false;
+            bool Expanded = false;
+            for (int i = 0; i < args.Count() - 1; i++)
+            {
+                if (args[1 + i].Equals("g"))
+                    Linear = false;
+                if (args[1 + i].Equals("e"))
+                    Expanded = true;
+            }
             for (int i = 1; i < numentries + 1; i++)
             {
                 entriespointers[i] = new PointerCouple();
@@ -983,22 +1012,23 @@ namespace M3GameLogic //Decompile Game Logic Table
                 if (entriespointers[i].Logic != baseaddress && entriespointers[i].Pointers != baseaddress)
                 {
                     Graph = PreProcessEntries(Data, ref entriespointers[i], ref entriespointers[0], Block0, CurrBlock, Linear);
-                    ConvertedEntries[i].AddRange(ReadGameLogicEntries(Data, entriespointers[i], CurrBlock, Block0, Graph, Linear, resList));
+                    ConvertedEntries[i].AddRange(ReadGameLogicEntries(Data, entriespointers[i], CurrBlock, Block0, Graph, Linear, Expanded, resList));
                 }
                 if (i == 0)
                     i = numentries;
             }
-                List<string> FinalProduct= new List<string>();
-            if (Linear)
-                FinalProduct.Add("L");
-            else
-                FinalProduct.Add("G");
+            List<string> FinalProduct= new List<string>();
+            
+            FinalProduct.Add(Linear ? "L" + (Expanded ? "E" : "") : "G");
+
             for (int i=0; i<numentries; i++)
             {
                 FinalProduct.AddRange(ConvertedEntries[i]);
                 FinalProduct.Add("");
             }
-            File.WriteAllLines("GameLogic.txt", FinalProduct);
+
+            string extraName = (Linear ? (Expanded ? "Expanded" : "") : "Graph");
+            File.WriteAllLines("GameLogic" + extraName + ".txt", FinalProduct);
             return 0;
         }
         private static void Compile(string[] args)

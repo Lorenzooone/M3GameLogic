@@ -121,25 +121,16 @@ namespace M3GameLogic
             int valid = 0;
 
             if (int.TryParse(parameters[0], out result))
-            {
-                valid |= 1;
-            }
-            else
-            {
-                try
-                {
-                    result = Convert.ToInt32(parameters[0], 16);
-                    valid |= 1;
-                }
-                catch (System.FormatException)
-                {
-                }
-            }
+                valid = 1;
+            else if (Utilities.FromHex(parameters[0], out result))
+                valid = 1;
+
             if (valid == 1)
             {
                 returnValue = operate(result);
                 return returnValue.ToString();
             }
+
             returnValue = SingleCommand.ImpossibleData;
             return operation + parameters[0] + operation2;
         }
@@ -197,25 +188,19 @@ namespace M3GameLogic
                     results[i] = result;
                     valid |= (1 << i);
                 }
-                else
+                else if (Utilities.FromHex(parameters[i], out result))
                 {
-                    try
-                    {
-                        result = Convert.ToInt32(parameters[i], 16);
-                        results[i] = result;
-                        valid |= (1 << i);
-                    }
-                    catch (System.FormatException)
-                    {
-
-                    }
+                    results[i] = result;
+                    valid |= (1 << i);
                 }
             }
+
             if (valid == 3)
             {
                 returnValue = operate(results[0], results[1]);
                 return returnValue.ToString();
             }
+
             returnValue = SingleCommand.ImpossibleData;
             return parameters[0] + " " + operation + " " + parameters[1];
         }
@@ -380,39 +365,31 @@ namespace M3GameLogic
     }
     class Extra : DataCommand
     {
-        SingleCommand Command;
-
-        public Extra(List<int> DataList, List<string> Strings, SingleCommand C) : base(DataList, Strings)
-        {
-            Command = C;
-        }
-
+        public Extra(Parser parser) : base(parser){ }
         public override string returnText(params string[] parameters)
         {
             string result = "";
-            for (int i = 0; i < Command.NumParam; i++)
+            for (int i = 0; i < ThisParser.CurrentCommand.NumParam; i++)
                 result += ", " + calledRetText(i.ToString());
             return result;
         }
     }
     class DataCommand : ParsingCommand
     {
-        List<int> DataList;
-        List<string> Strings;
-
-        public DataCommand(List<int> DataList, List<string> Strings)
+        Parser thisParser;
+        public DataCommand(Parser parser)
         {
-            this.DataList = DataList;
-            this.Strings = Strings;
+            ThisParser = parser;
         }
+        internal Parser ThisParser { get => thisParser; set => thisParser = value; }
         public string calledRetText(params string[] parameters)
         {
             int slot = int.Parse(parameters[0]);
-            if (DataList.Count - slot - 1 >= 0)
+            if (ThisParser.DataValues.Count - slot - 1 >= 0)
             {
-                if (DataList[DataList.Count - slot - 1] == SingleCommand.ImpossibleData)
-                    return Strings[DataList.Count - slot - 1];
-                return DataList[DataList.Count - slot - 1].ToString();
+                if (ThisParser.DataValues[ThisParser.DataValues.Count - slot - 1] == SingleCommand.ImpossibleData)
+                    return ThisParser.DataStrings[ThisParser.DataValues.Count - slot - 1];
+                return ThisParser.DataValues[ThisParser.DataValues.Count - slot - 1].ToString();
             }
             return "$" + (slot + 1);
         }
@@ -423,9 +400,12 @@ namespace M3GameLogic
     }
     class Parser
     {
+        static readonly Regex regexSquare = new Regex(@"([\[\]\,])", RegexOptions.Compiled);
+        static readonly Regex regexCircular = new Regex(@"([\(\)])", RegexOptions.Compiled);
         ResourcesList resLists;
         List<int> dataValues;
         List<string> dataStrings;
+        SingleCommand currentCommand;
         int latestValue;
         IDictionary<string, ParsingCommand> parsingCommands = new Dictionary<string, ParsingCommand>(){
         {"hex", new Hex()},
@@ -453,26 +433,26 @@ namespace M3GameLogic
         {"le", new Le()},
         };
 
-        public Parser(Block Block0, Block CurrBlock, ResourcesList resourcesList, List<int> dataValues, List<String> dataStrings)
+        public Parser(Block Block0, Block CurrBlock, ResourcesList resourcesList)
         {
             ResLists = resourcesList;
             parsingCommands.Add("block0", new BlockCommand(Block0));
             parsingCommands.Add("block", new BlockCommand(CurrBlock));
             parsingCommands.Add("blocknum", new BlockNum(CurrBlock));
-            DataValues = dataValues;
-            DataStrings = dataStrings;
-            parsingCommands.Add("data", new DataCommand(DataValues, DataStrings));
+            parsingCommands.Add("data", new DataCommand(this));
+            parsingCommands.Add("extra", new Extra(this));
         }
-        
+
         public List<int> DataValues { get => dataValues; set => dataValues = value; }
         public List<string> DataStrings { get => dataStrings; set => dataStrings = value; }
         internal ResourcesList ResLists { get => resLists; set => resLists = value; }
+        public SingleCommand CurrentCommand { get => currentCommand; set => currentCommand = value; }
 
-        public string TranslateToText(SingleCommand Command)
+        public string TranslateToText(SingleCommand Command, List<int> dataValues, List<string> dataStrings)
         {
-            if (parsingCommands.ContainsKey("extra"))
-                parsingCommands.Remove("extra");
-            parsingCommands.Add("extra", new Extra(DataValues, DataStrings, Command));
+            DataStrings = dataStrings;
+            DataValues = dataValues;
+            CurrentCommand = Command;
             String commandText = ResLists.getWantedInfo("MAIN", Command.CommandType.ToString());
             if (commandText != "")
             {
@@ -492,7 +472,7 @@ namespace M3GameLogic
         private string[] specialSplit(string text)
         {
             List<string> newStrings = new List<string>();
-            String[] splitString = Regex.Split(text, @"([\[\]\,])");
+            String[] splitString = regexSquare.Split(text);
             for (int i = 0; i < splitString.Length; i++)
             {
                 if (splitString[i] == "[") //Cover nested stuff
@@ -520,7 +500,7 @@ namespace M3GameLogic
         private int findSpecialEndIndex(string text)
         {
             int countLayer = 1;
-            String[] splitString = Regex.Split(text, @"([\(\)])");
+            String[] splitString = regexCircular.Split(text);
             int i = 0;
             string product = "";
             while (countLayer > 0)

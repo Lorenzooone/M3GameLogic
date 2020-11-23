@@ -53,8 +53,8 @@
         "default": "\\data(0)"
     },
     "221": {
-        "1": "SECOND",
-        "0": "FIRST",
+        "1": "UPPER",
+        "0": "LOWER",
         "default": "\\data()"
     },
     "239": {
