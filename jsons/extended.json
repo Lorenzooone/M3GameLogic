@@ -56,6 +56,7 @@
     "137": "[SET FIRST SONG TO \\data(0) FOR MAP \\data(1)]",
     "139": "[SET SECOND SONG TO \\data(0) FOR MAP \\data(1)]",
     "140": "[START BATTLE \\data(0)]",
+    "146": "[GAME OVER]",
     "156": "[PUSH BATTLE MEMORY COMPLETENESS]",
     "157": "[RESET DRAWING MODE]",
     "158": "[SET MONEY ON HAND TO \\data(0), NO LIMITATIONS]",
