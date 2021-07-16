@@ -44,6 +44,12 @@
         "-1": "SAME AS CURRENT",
         "default": "\\data(0)"
     },
+    "182": {
+        "0": "SCROLLING TEXT",
+        "1": "CENTERED TEXT",
+        "2": "NOTEBOOK TEXT",
+        "default": "\\data(0)"
+    },
     "193": {
         "-1": "OBJECT",
         "default": "PARTY MEMBER \\data(0)"
